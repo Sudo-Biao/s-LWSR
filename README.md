@@ -53,7 +53,7 @@ For more informaiton, please refer to [EDSR(PyTorch)](https://github.com/thstkdg
 
 ## Test
 ### Quick start
-1. Download our  pre-trained  models and place them in '/Test/model'.
+1. Download our  pre-trained  models [s-LWSR(PyTorch)](https://drive.google.com/drive/folders/11eqKn1PsLXRtbrbh_LhJ7WxHtU8Ih2ym) and place them in '/Test/model'. Please be make sure that the code and its corresponding pre-trained model are consistant, because there are several different settings contained in our files. 
 
     We just  train  our  model on X4 task and  more  information  will  be released soon.
 
