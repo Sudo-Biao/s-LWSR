@@ -1,0 +1,13 @@
+/home/li/anaconda3/envs/tensorflow/lib/python3.6/site-packages/dask/config.py:169: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  data = yaml.load(f.read()) or {}
+Preparing seperated binary files
+Preparing seperated binary files
+Making model...
+Traceback (most recent call last):
+  File "main.py", line 15, in <module>
+    model = model.Model(args, checkpoint)
+  File "/home/li/桌面/s-LWSR（github）/Train/code/model/__init__.py", line 24, in __init__
+    self.model = module.make_model(args).to(self.device)
+  File "/home/li/桌面/s-LWSR（github）/Train/code/model/lwsr.py", line 8, in make_model
+    return RCAN(args)
+NameError: name 'RCAN' is not defined

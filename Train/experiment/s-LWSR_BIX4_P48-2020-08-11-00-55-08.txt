@@ -1,0 +1,16 @@
+/home/li/anaconda3/envs/tensorflow/lib/python3.6/site-packages/dask/config.py:169: YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated, as the default Loader is unsafe. Please read https://msg.pyyaml.org/load for full details.
+  data = yaml.load(f.read()) or {}
+Preparing seperated binary files
+Preparing seperated binary files
+Making model...
+Traceback (most recent call last):
+  File "main.py", line 15, in <module>
+    model = model.Model(args, checkpoint)
+  File "/home/li/桌面/s-LWSR（github）/Train/code/model/__init__.py", line 23, in __init__
+    module = import_module('model.' + args.model.lower())
+  File "/home/li/anaconda3/envs/tensorflow/lib/python3.6/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 994, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 971, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 953, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'model.lwsr'

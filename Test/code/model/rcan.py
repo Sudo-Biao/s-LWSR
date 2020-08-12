@@ -2,48 +2,59 @@ from model import common
 
 import torch.nn as nn
 
+import torch
+
 def make_model(args, parent=False):
     return RCAN(args)
 
+def default_conv(in_channels, out_channels, kernel_size, bias=True):
+    return nn.Conv2d(
+        in_channels, out_channels, kernel_size,
+        padding=(kernel_size//2), bias=bias)
 ## Channel Attention (CA) Layer
-class CALayer(nn.Module):
-    def __init__(self, channel, reduction=16):
-        super(CALayer, self).__init__()
-        # global average pooling: feature --> point
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        # feature channel downscale and upscale --> channel weight
-        self.conv_du = nn.Sequential(
-                nn.Conv2d(channel, channel // reduction, 1, padding=0, bias=True),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(channel // reduction, channel, 1, padding=0, bias=True),
-                nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        y = self.avg_pool(x)
-        y = self.conv_du(y)
-        return x * y
-
-## Residual Channel Attention Block (RCAB)
-class RCAB(nn.Module):
+class ResBlock(nn.Module):
     def __init__(
-        self, conv, n_feat, kernel_size, reduction,
+        self, conv, n_feat, kernel_size,
         bias=True, bn=False, act=nn.ReLU(True), res_scale=1):
 
-        super(RCAB, self).__init__()
-        modules_body = []
+        super(ResBlock, self).__init__()
+        m = []
         for i in range(2):
-            modules_body.append(conv(n_feat, n_feat, kernel_size, bias=bias))
-            if bn: modules_body.append(nn.BatchNorm2d(n_feat))
-            if i == 0: modules_body.append(act)
-        modules_body.append(CALayer(n_feat, reduction))
-        self.body = nn.Sequential(*modules_body)
+            m.append(conv(n_feat, n_feat, kernel_size, bias=bias))
+            if bn: m.append(nn.BatchNorm2d(n_feat))
+            if i == 0: m.append(act)
+
+        self.body = nn.Sequential(*m)
         self.res_scale = res_scale
 
     def forward(self, x):
-        res = self.body(x)
-        #res = self.body(x).mul(self.res_scale)
+        res = self.body(x).mul(self.res_scale)
         res += x
+
+        return res
+
+class ResBlock2(nn.Module):
+    def __init__(
+        self, conv, n_feat, kernel_size,
+        bias=True, bn=False, act=nn.ReLU(True), res_scale=1):
+
+        super(ResBlock2, self).__init__()
+        self.conv = conv(n_feat*2, n_feat, 1, bias=bias)
+
+        m = []
+        for i in range(2):
+            m.append(conv(n_feat, n_feat, kernel_size, bias=bias))
+            if bn: m.append(nn.BatchNorm2d(n_feat))
+            if i == 0: m.append(act)
+
+        self.body = nn.Sequential(*m)
+        self.res_scale = res_scale
+
+    def forward(self, x):
+        ori = self.conv(x)
+        res = self.body(ori).mul(self.res_scale)
+        res += ori
+
         return res
 
 ## Residual Group (RG)
@@ -67,53 +78,140 @@ class ResidualGroup(nn.Module):
 class RCAN(nn.Module):
     def __init__(self, args, conv=common.default_conv):
         super(RCAN, self).__init__()
-        
+
         n_resgroups = args.n_resgroups
         n_resblocks = args.n_resblocks
         n_feats = args.n_feats
         kernel_size = 3
-        reduction = args.reduction 
+        reduction = args.reduction
         scale = args.scale[0]
         act = nn.ReLU(True)
-        
+
         # RGB mean for DIV2K
         rgb_mean = (0.4488, 0.4371, 0.4040)
         rgb_std = (1.0, 1.0, 1.0)
         self.sub_mean = common.MeanShift(args.rgb_range, rgb_mean, rgb_std)
-        
+
         # define head module
         modules_head = [conv(args.n_colors, n_feats, kernel_size)]
 
-        # define body module
-        modules_body = [
-            ResidualGroup(
-                conv, n_feats, kernel_size, reduction, act=act, res_scale=args.res_scale, n_resblocks=n_resblocks) \
-            for _ in range(n_resgroups)]
+        self.add_mean = common.MeanShift(args.rgb_range, rgb_mean, rgb_std, 1)
 
-        modules_body.append(conv(n_feats, n_feats, kernel_size))
+        self.head = nn.Sequential(*modules_head)
+        # define body module
+
+  #  def __init__(
+  #      self, conv, n_feat, kernel_size,
+  #      bias=True, bn=False, act=nn.ReLU(True), res_scale=1):
+
+        self.feat2_1 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.feat2_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.feat2_3 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+
+
+        self.feat3_1 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.feat3_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.feat3_3 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+
+        self.feat4_1 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat4_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.feat4_3 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+
+
+        self.feat5_1 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat5_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.feat5_3 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+
+
+        self.feat6_1 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat6_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+
+        self.conv1 = conv(6*n_feats, n_feats, 1, bias=False)
+
+        self.feat7_1 = ResBlock2(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat7_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.conv7 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+     #   self.conv7 = ConvBlock(base_filter2, base_filter, 1, 1, 0, activation='prelu', norm=None)
+
+        self.feat8_1 = ResBlock2(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat8_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+        self.conv8 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+     #   self.conv8 = ConvBlock(base_filter2, base_filter, 1, 1, 0, activation='prelu', norm=None)
+
+        self.feat9_1 = ResBlock2(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat9_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+     #   self.conv9 = nn.conv2d(base_filter2, base_filter, kernel_size = 1, stride = 1, padding = 0)
+        self.conv9 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+
+        self.feat10_1 = ResBlock2(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(True), res_scale=1)
+        self.feat10_2 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+     #   self.conv10 = nn.conv2d(base_filter2, base_filter, kernel_size = 1, stride = 1, padding = 0)
+        self.conv10 = ResBlock(conv, n_feats, kernel_size, bias=True, bn=False, act=nn.ReLU(False), res_scale=1)
+
+
+  #      self.conv11 = torch.nn.Conv2d(base_filter*2, base_filter, 1, 1, 0)
 
         # define tail module
         modules_tail = [
             common.Upsampler(conv, scale, n_feats, act=False),
             conv(n_feats, args.n_colors, kernel_size)]
 
-        self.add_mean = common.MeanShift(args.rgb_range, rgb_mean, rgb_std, 1)
 
-        self.head = nn.Sequential(*modules_head)
-        self.body = nn.Sequential(*modules_body)
         self.tail = nn.Sequential(*modules_tail)
 
     def forward(self, x):
         x = self.sub_mean(x)
-        x = self.head(x)
+        x1 = self.head(x)
 
-        res = self.body(x)
-        res += x
 
-        x = self.tail(res)
+        feat2_1 = self.feat2_1(x1)
+        feat2_2 = self.feat2_2(feat2_1)
+        feat2_3 = self.feat2_3(feat2_2)
+
+        feat3_1 = self.feat3_1(torch.add(feat2_1, feat2_3))
+        feat3_2 = self.feat3_2(feat3_1)
+        feat3_3 = self.feat3_3(feat3_2)
+
+        feat4_1 = self.feat4_1(torch.add(feat3_1, feat3_3))
+        feat4_2 = self.feat4_2(feat4_1)
+        feat4_3 = self.feat4_3(feat4_2)
+
+        feat5_1 = self.feat5_1(torch.add(feat4_1, feat4_3))
+        feat5_2 = self.feat5_2(feat5_1)
+        feat5_3 = self.feat5_3(feat5_2)
+
+        feat6_1 = self.feat6_1(torch.add(feat5_1, feat5_3))
+        feat6_2 = self.feat6_2(feat6_1)
+
+        bool = torch.cat([x1, feat3_1, feat4_1, feat5_1, feat6_1, feat6_2], 1)
+        conv1 = self.conv1(bool)
+
+        concat_7 = torch.cat([feat6_2, 0.5*feat5_3 + 0.5*conv1],1)
+        feat7_1 = self.feat7_1(concat_7)
+        feat7_2 = self.feat7_2(feat7_1)
+        conv7 = self.conv7(feat7_2)
+
+        concat_8 = torch.cat([conv7, 0.5*feat4_3+0.5*conv1],1)
+        feat8_1 = self.feat8_1(concat_8)
+        feat8_2 = self.feat8_2(feat8_1)
+        conv8 = self.conv8(feat8_2)
+
+        concat_9 = torch.cat([conv8, 0.5*feat3_3+0.5*conv1],1)
+        feat9_1 = self.feat9_1(concat_9)
+        feat9_2 = self.feat9_2(feat9_1)
+        conv9 = self.conv9(feat9_2)
+
+        concat_10 = torch.cat([conv9, 0.5*feat2_3+0.5*conv1],1)
+        feat10_1 = self.feat10_1(concat_10)
+        feat10_2 = self.feat10_2(feat10_1)
+        conv10 = self.conv10(feat10_2)
+
+        conv10 += x1
+
+        x = self.tail(conv10)
         x = self.add_mean(x)
 
-        return x 
+        return x
 
     def load_state_dict(self, state_dict, strict=False):
         own_state = self.state_dict()

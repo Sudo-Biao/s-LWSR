@@ -51,13 +51,8 @@ class Trainer():
             timer_model.tic()
 
             self.optimizer.zero_grad()
-            out1, out2, out3, out4, sr = self.model(lr, idx_scale)
-            loss1 = self.triloss(out2, lr, out1)
-            loss2 = self.triloss(out3, lr, out2)
-            loss3 = self.triloss(out4, lr, out3)
-#            loss4 = self.triloss(sr, hr, out4)
-            loss5 = self.loss(sr, hr)
-            loss = loss5 +0.05*loss3 + 0.03*loss2 + 0.01*loss1
+            sr = self.model(lr, idx_scale)
+            loss = self.loss(sr, hr)
             if loss.item() < self.args.skip_threshold * self.error_last:
                 loss.backward()
                 self.optimizer.step()
