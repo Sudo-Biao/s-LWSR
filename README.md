@@ -1,7 +1,7 @@
 # s-LWSR: Super Lightweight Super-Resolution Network
 This is the code of the paper in following:
 
-[Biao Li](https://github.com/Sudo-Biao), [Jiabin Liu](https://github.com/liujiabin008), [Bo Wang](http://it.uibe.edu.cn/szdw/dsjkxyjzx/50452.htm), [Zhiquan Qi](https://github.com/qizhiquan) and [Yong Shi](http://www.feds.ac.cn/index.php/zh-cn/zxjs/zxld/1447-sy)"s-LWSR: Super Lightweight Super-Resolution Network", [[arXiv]](https://arxiv.org/abs/1909.10774) 
+[Biao Li](https://github.com/Sudo-Biao), [Bo Wang](http://it.uibe.edu.cn/szdw/dsjkxyjzx/50452.htm), [Jiabin Liu](https://github.com/liujiabin008), [Zhiquan Qi](https://github.com/qizhiquan) and [Yong Shi](http://www.feds.ac.cn/index.php/zh-cn/zxjs/zxld/1447-sy)"s-LWSR: Super Lightweight Super-Resolution Network", [[arXiv]](https://arxiv.org/abs/1909.10774) [Accepted by IEEE Transactions on Image Processing]
 
 
 The code is built on [EDSR (PyTorch)](https://github.com/thstkdgus35/EDSR-PyTorch) and [RCAN(Pytorch)](https://github.com/yulunzhang/RCAN), and tested on Ubuntu 18.04 environment (Python3.7, PyTorch_1.0) with Titan Xp GPU. 
